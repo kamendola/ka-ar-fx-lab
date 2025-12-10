@@ -1,0 +1,98 @@
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.uploadArea {
+  position: relative;
+  flex: 1;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.uploadBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: normal;
+  letter-spacing: 2px;
+  color: var(--text);
+  background: var(--bg);
+  border: none;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  width: 100%;
+}
+
+.uploadBtn:hover {
+  background: var(--border);
+}
+
+.uploadIcon {
+  font-size: 12px;
+}
+
+.controlBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: normal;
+  letter-spacing: 2px;
+  color: var(--text);
+  background: var(--bg);
+  border: none;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  transition: none;
+}
+
+.controlBtn:last-child {
+  border-right: none;
+}
+
+.controlBtn:hover {
+  background: var(--border);
+}
+
+.controlBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.controlBtn.danger {
+  color: var(--text);
+}
+
+.controlBtn.danger:hover {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.controlBtn.rendering {
+  color: var(--text);
+  background: var(--border);
+}
+
+.btnIcon {
+  font-size: 12px;
+}

@@ -1,0 +1,110 @@
+.panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.toggleBtn {
+  padding: 4px 10px;
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.toggleBtn:hover {
+  background: var(--border);
+}
+
+.toggleBtn.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.content {
+  padding: 15px;
+}
+
+.statusMessage {
+  font-size: 10px;
+  color: var(--text);
+  text-align: center;
+  padding: 15px;
+}
+
+.errorMessage {
+  color: var(--text);
+}
+
+.levelBars {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.levelBar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.levelLabel {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--text);
+  text-align: center;
+}
+
+.levelBarContainer {
+  height: 60px;
+  border: 1px solid var(--border);
+  position: relative;
+  background: var(--bg);
+}
+
+.levelBarFill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--text);
+  transition: height 0.1s ease;
+}
+
+.levelValue {
+  font-size: 8px;
+  color: var(--text);
+  text-align: center;
+}
+
+.freqBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 80px;
+  border: 1px solid var(--border);
+  padding: 5px;
+  background: var(--bg);
+}
+
+.freqBar {
+  flex: 1;
+  background: var(--text);
+  min-height: 2px;
+  transition: height 0.1s ease;
+}

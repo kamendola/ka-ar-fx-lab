@@ -1,0 +1,205 @@
+.panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 12px;
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: 2px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+}
+
+.effectsGrid {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.effectCard {
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.effectCard:last-child {
+  border-bottom: none;
+}
+
+.effectHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.dragHandle {
+  cursor: grab;
+  color: var(--text);
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.effectCard.dragging {
+  opacity: 0.5;
+}
+
+.effectCard.dragOver {
+  border-top: 2px solid var(--text);
+}
+
+.stackNumber {
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.effectToggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.effectInfo {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.effectName {
+  font-size: 10px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+
+.effectStatus {
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
+.effectCard.active .effectStatus {
+  color: var(--text);
+}
+
+.effectParams {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.paramRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.paramRow:last-child {
+  margin-bottom: 0;
+}
+
+.paramLabel {
+  width: 60px;
+  font-size: 9px;
+  color: var(--text);
+  letter-spacing: 1px;
+}
+
+.paramSlider {
+  flex: 1;
+  height: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+
+.paramSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--text);
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.paramSlider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--text);
+  cursor: pointer;
+  border: none;
+  border-radius: 0;
+}
+
+.paramValue {
+  width: 30px;
+  font-size: 9px;
+  color: var(--text);
+  text-align: right;
+}
+
+.paramColorInput {
+  width: 40px;
+  height: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+  padding: 0;
+}
+
+.paramColorInput::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.paramColorInput::-webkit-color-swatch {
+  border: none;
+}
+
+.paramToggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.paramToggle:hover {
+  background: var(--border);
+}
+
+.paramToggle.toggleActive {
+  background: var(--text);
+  color: var(--bg);
+}
