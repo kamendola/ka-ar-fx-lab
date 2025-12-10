@@ -885,7 +885,10 @@ export function applyFlow(ctx, canvas, params, time, audioData) {
   }
 }
 
-// Apply contour lines effect (optimized - reduced resolution)
+// Reusable canvas for contour
+let contourCanvas = null;
+
+// Apply contour lines effect - topographic map style
 export function applyContour(ctx, canvas, params, time, audioData) {
   const { levels, smoothness, colorful } = params;
   const audioBoost = audioData?.overall || 0;
@@ -894,64 +897,105 @@ export function applyContour(ctx, canvas, params, time, audioData) {
   const height = canvas.height;
   
   // Downsample for performance
-  const scale = 0.5;
+  const scale = 0.4;
   const sw = (width * scale) | 0;
   const sh = (height * scale) | 0;
   
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = sw;
-  tempCanvas.height = sh;
-  const tempCtx = tempCanvas.getContext('2d');
+  if (!contourCanvas || contourCanvas.width !== sw) {
+    contourCanvas = document.createElement('canvas');
+    contourCanvas.width = sw;
+    contourCanvas.height = sh;
+  }
+  const tempCtx = contourCanvas.getContext('2d');
+  
+  // Apply blur for smoother contours
+  tempCtx.filter = `blur(${smoothness}px)`;
   tempCtx.drawImage(canvas, 0, 0, sw, sh);
+  tempCtx.filter = 'none';
   
   const imageData = tempCtx.getImageData(0, 0, sw, sh);
   const data = imageData.data;
   
-  // Create brightness map (flat array for speed)
-  const brightnessMap = new Uint8Array(sw * sh);
-  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
-    brightnessMap[j] = (data[i] + data[i + 1] + data[i + 2]) * 0.333;
+  // Create brightness map
+  const brightnessMap = [];
+  for (let y = 0; y < sh; y++) {
+    brightnessMap[y] = [];
+    for (let x = 0; x < sw; x++) {
+      const i = (y * sw + x) * 4;
+      brightnessMap[y][x] = (data[i] + data[i + 1] + data[i + 2]) / 3;
+    }
   }
   
+  // Clear canvas with dark background
   ctx.fillStyle = '#0a0a0f';
   ctx.fillRect(0, 0, width, height);
   
-  const numLevels = Math.min(12, Math.floor(levels * (1 + audioBoost * 0.3)));
-  const step = Math.max(2, Math.floor(sw / (smoothness * 4)));
+  const numLevels = Math.max(4, Math.floor(levels * (1 + audioBoost * 0.3)));
   const scaleUp = 1 / scale;
-  const lineWidth = 1 + audioBoost * 2;
   
-  ctx.lineWidth = lineWidth;
+  ctx.lineWidth = 1.5;
   ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
   
+  // Marching squares for each contour level
   for (let level = 0; level < numLevels; level++) {
-    const threshold = (level / numLevels) * 255;
+    const threshold = ((level + 0.5) / numLevels) * 255;
     
     if (colorful) {
-      ctx.strokeStyle = `hsla(${(level / numLevels) * 300 + time * 20}, 100%, 60%, 0.8)`;
+      const hue = (level / numLevels) * 300 + time * 20;
+      ctx.strokeStyle = `hsla(${hue}, 100%, 60%, 0.8)`;
     } else {
-      ctx.strokeStyle = `rgba(0, 255, 255, ${0.3 + (level / numLevels) * 0.5})`;
+      const alpha = 0.3 + (level / numLevels) * 0.5;
+      ctx.strokeStyle = `rgba(0, 255, 255, ${alpha})`;
     }
     
     ctx.beginPath();
     
-    // Simplified contour detection
-    for (let y = 0; y < sh - step; y += step) {
-      for (let x = 0; x < sw - step; x += step) {
-        const idx = y * sw + x;
-        const b1 = brightnessMap[idx];
-        const b2 = brightnessMap[idx + step];
-        const b3 = brightnessMap[idx + step * sw];
+    // Marching squares algorithm
+    for (let y = 0; y < sh - 1; y++) {
+      for (let x = 0; x < sw - 1; x++) {
+        const tl = brightnessMap[y][x];
+        const tr = brightnessMap[y][x + 1];
+        const bl = brightnessMap[y + 1][x];
+        const br = brightnessMap[y + 1][x + 1];
         
-        if ((b1 < threshold) !== (b2 < threshold)) {
-          const t = (threshold - b1) / (b2 - b1 + 0.001);
-          ctx.moveTo((x + t * step) * scaleUp, y * scaleUp);
-          ctx.lineTo((x + t * step) * scaleUp + 1, y * scaleUp + 1);
-        }
-        if ((b1 < threshold) !== (b3 < threshold)) {
-          const t = (threshold - b1) / (b3 - b1 + 0.001);
-          ctx.moveTo(x * scaleUp, (y + t * step) * scaleUp);
-          ctx.lineTo(x * scaleUp + 1, (y + t * step) * scaleUp + 1);
+        // Determine case
+        let caseIndex = 0;
+        if (tl >= threshold) caseIndex |= 1;
+        if (tr >= threshold) caseIndex |= 2;
+        if (br >= threshold) caseIndex |= 4;
+        if (bl >= threshold) caseIndex |= 8;
+        
+        if (caseIndex === 0 || caseIndex === 15) continue;
+        
+        // Interpolate edge positions
+        const lerp = (v1, v2) => (threshold - v1) / (v2 - v1 + 0.001);
+        
+        const top = { x: (x + lerp(tl, tr)) * scaleUp, y: y * scaleUp };
+        const right = { x: (x + 1) * scaleUp, y: (y + lerp(tr, br)) * scaleUp };
+        const bottom = { x: (x + lerp(bl, br)) * scaleUp, y: (y + 1) * scaleUp };
+        const left = { x: x * scaleUp, y: (y + lerp(tl, bl)) * scaleUp };
+        
+        // Draw line segments based on case
+        switch (caseIndex) {
+          case 1: case 14:
+            ctx.moveTo(top.x, top.y); ctx.lineTo(left.x, left.y); break;
+          case 2: case 13:
+            ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y); break;
+          case 3: case 12:
+            ctx.moveTo(left.x, left.y); ctx.lineTo(right.x, right.y); break;
+          case 4: case 11:
+            ctx.moveTo(right.x, right.y); ctx.lineTo(bottom.x, bottom.y); break;
+          case 5:
+            ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y);
+            ctx.moveTo(bottom.x, bottom.y); ctx.lineTo(left.x, left.y); break;
+          case 6: case 9:
+            ctx.moveTo(top.x, top.y); ctx.lineTo(bottom.x, bottom.y); break;
+          case 7: case 8:
+            ctx.moveTo(left.x, left.y); ctx.lineTo(bottom.x, bottom.y); break;
+          case 10:
+            ctx.moveTo(top.x, top.y); ctx.lineTo(left.x, left.y);
+            ctx.moveTo(right.x, right.y); ctx.lineTo(bottom.x, bottom.y); break;
         }
       }
     }
