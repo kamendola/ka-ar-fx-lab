@@ -138,11 +138,13 @@ export const EFFECTS = {
     icon: 'T',
     description: 'Automated detection overlay',
     params: {
+      style: { min: 0, max: 1, default: 0 },              // 0=tech, 1=recognition (simple blue boxes)
       targets: { min: 0, max: 20, default: 5 },
       sensitivity: { min: 10, max: 150, default: 60 },    // detection sensitivity
+      boxColor: { type: 'color', default: '#0088ff' },    // box outline color
       overlay: { min: 0, max: 100, default: 0 },          // black overlay opacity
-      mainColor: { type: 'color', default: '#00ff00' },   // main color
-      accentColor: { type: 'color', default: '#00ffff' }, // accent color
+      mainColor: { type: 'color', default: '#00ff00' },   // main color (tech style)
+      accentColor: { type: 'color', default: '#00ffff' }, // accent color (tech style)
       brackets: { min: 0, max: 1, default: 1 },
       crosshairs: { min: 0, max: 1, default: 1 },
       dots: { min: 0, max: 1, default: 1 },               // tracking dots
@@ -287,6 +289,21 @@ export const EFFECTS = {
       centerY: { min: 0, max: 100, default: 50 },         // center Y for radial/circular
       tint: { type: 'color', default: '#ffffff' },        // trail color tint
       fadeOut: { min: 0, max: 1, default: 1 },            // fade trails
+    },
+  },
+  transform3d: {
+    name: '3D TRANSFORM',
+    icon: '3',
+    description: 'Real 3D geometric transforms',
+    params: {
+      mode: { min: 0, max: 6, default: 0 },               // 0=rotate, 1=bend, 2=sphere, 3=cylinder, 4=wave, 5=fold, 6=twist
+      rotateX: { min: -60, max: 60, default: 0 },         // X rotation (tilt)
+      rotateY: { min: -60, max: 60, default: 0 },         // Y rotation (turn)
+      rotateZ: { min: -180, max: 180, default: 0 },       // Z rotation (spin)
+      bend: { min: -100, max: 100, default: 0 },          // bend amount
+      perspective: { min: 200, max: 2000, default: 800 }, // perspective distance
+      segments: { min: 10, max: 50, default: 20 },        // mesh quality
+      animate: { min: 0, max: 1, default: 0 },            // auto-animate
     },
   },
 };
@@ -897,11 +914,12 @@ export function applyContour(ctx, canvas, params, time, audioData) {
   const height = canvas.height;
   
   // Downsample for performance
-  const scale = 0.4;
-  const sw = (width * scale) | 0;
-  const sh = (height * scale) | 0;
+  const scale = 0.5;
+  const sw = Math.floor(width * scale);
+  const sh = Math.floor(height * scale);
   
-  if (!contourCanvas || contourCanvas.width !== sw) {
+  // Reuse or create temp canvas
+  if (!contourCanvas || contourCanvas.width !== sw || contourCanvas.height !== sh) {
     contourCanvas = document.createElement('canvas');
     contourCanvas.width = sw;
     contourCanvas.height = sh;
@@ -909,21 +927,18 @@ export function applyContour(ctx, canvas, params, time, audioData) {
   const tempCtx = contourCanvas.getContext('2d');
   
   // Apply blur for smoother contours
-  tempCtx.filter = `blur(${smoothness}px)`;
+  const blurAmount = Math.max(1, smoothness);
+  tempCtx.filter = `blur(${blurAmount}px)`;
   tempCtx.drawImage(canvas, 0, 0, sw, sh);
   tempCtx.filter = 'none';
   
   const imageData = tempCtx.getImageData(0, 0, sw, sh);
   const data = imageData.data;
   
-  // Create brightness map
-  const brightnessMap = [];
-  for (let y = 0; y < sh; y++) {
-    brightnessMap[y] = [];
-    for (let x = 0; x < sw; x++) {
-      const i = (y * sw + x) * 4;
-      brightnessMap[y][x] = (data[i] + data[i + 1] + data[i + 2]) / 3;
-    }
+  // Create brightness map (flat for speed)
+  const brightnessMap = new Float32Array(sw * sh);
+  for (let i = 0, j = 0; i < data.length; i += 4, j++) {
+    brightnessMap[j] = (data[i] + data[i + 1] + data[i + 2]) / 3;
   }
   
   // Clear canvas with dark background
@@ -954,10 +969,11 @@ export function applyContour(ctx, canvas, params, time, audioData) {
     // Marching squares algorithm
     for (let y = 0; y < sh - 1; y++) {
       for (let x = 0; x < sw - 1; x++) {
-        const tl = brightnessMap[y][x];
-        const tr = brightnessMap[y][x + 1];
-        const bl = brightnessMap[y + 1][x];
-        const br = brightnessMap[y + 1][x + 1];
+        const idx = y * sw + x;
+        const tl = brightnessMap[idx];
+        const tr = brightnessMap[idx + 1];
+        const bl = brightnessMap[idx + sw];
+        const br = brightnessMap[idx + sw + 1];
         
         // Determine case
         let caseIndex = 0;
@@ -969,33 +985,37 @@ export function applyContour(ctx, canvas, params, time, audioData) {
         if (caseIndex === 0 || caseIndex === 15) continue;
         
         // Interpolate edge positions
-        const lerp = (v1, v2) => (threshold - v1) / (v2 - v1 + 0.001);
+        const lerp = (v1, v2) => Math.max(0, Math.min(1, (threshold - v1) / (v2 - v1 + 0.001)));
         
-        const top = { x: (x + lerp(tl, tr)) * scaleUp, y: y * scaleUp };
-        const right = { x: (x + 1) * scaleUp, y: (y + lerp(tr, br)) * scaleUp };
-        const bottom = { x: (x + lerp(bl, br)) * scaleUp, y: (y + 1) * scaleUp };
-        const left = { x: x * scaleUp, y: (y + lerp(tl, bl)) * scaleUp };
+        const topX = (x + lerp(tl, tr)) * scaleUp;
+        const topY = y * scaleUp;
+        const rightX = (x + 1) * scaleUp;
+        const rightY = (y + lerp(tr, br)) * scaleUp;
+        const bottomX = (x + lerp(bl, br)) * scaleUp;
+        const bottomY = (y + 1) * scaleUp;
+        const leftX = x * scaleUp;
+        const leftY = (y + lerp(tl, bl)) * scaleUp;
         
         // Draw line segments based on case
         switch (caseIndex) {
           case 1: case 14:
-            ctx.moveTo(top.x, top.y); ctx.lineTo(left.x, left.y); break;
+            ctx.moveTo(topX, topY); ctx.lineTo(leftX, leftY); break;
           case 2: case 13:
-            ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y); break;
+            ctx.moveTo(topX, topY); ctx.lineTo(rightX, rightY); break;
           case 3: case 12:
-            ctx.moveTo(left.x, left.y); ctx.lineTo(right.x, right.y); break;
+            ctx.moveTo(leftX, leftY); ctx.lineTo(rightX, rightY); break;
           case 4: case 11:
-            ctx.moveTo(right.x, right.y); ctx.lineTo(bottom.x, bottom.y); break;
+            ctx.moveTo(rightX, rightY); ctx.lineTo(bottomX, bottomY); break;
           case 5:
-            ctx.moveTo(top.x, top.y); ctx.lineTo(right.x, right.y);
-            ctx.moveTo(bottom.x, bottom.y); ctx.lineTo(left.x, left.y); break;
+            ctx.moveTo(topX, topY); ctx.lineTo(rightX, rightY);
+            ctx.moveTo(bottomX, bottomY); ctx.lineTo(leftX, leftY); break;
           case 6: case 9:
-            ctx.moveTo(top.x, top.y); ctx.lineTo(bottom.x, bottom.y); break;
+            ctx.moveTo(topX, topY); ctx.lineTo(bottomX, bottomY); break;
           case 7: case 8:
-            ctx.moveTo(left.x, left.y); ctx.lineTo(bottom.x, bottom.y); break;
+            ctx.moveTo(leftX, leftY); ctx.lineTo(bottomX, bottomY); break;
           case 10:
-            ctx.moveTo(top.x, top.y); ctx.lineTo(left.x, left.y);
-            ctx.moveTo(right.x, right.y); ctx.lineTo(bottom.x, bottom.y); break;
+            ctx.moveTo(topX, topY); ctx.lineTo(leftX, leftY);
+            ctx.moveTo(rightX, rightY); ctx.lineTo(bottomX, bottomY); break;
         }
       }
     }
@@ -1007,7 +1027,7 @@ export function applyContour(ctx, canvas, params, time, audioData) {
 // Apply tracking/detection overlay effect
 export function applyTracking(ctx, canvas, params, time, audioData) {
   const { 
-    targets, sensitivity, overlay, mainColor, accentColor,
+    style, targets, sensitivity, boxColor, overlay, mainColor, accentColor,
     brackets, crosshairs, dots, scanline, 
     grid, databoxes, labels, lines, frame, timestamp, glitch 
   } = params;
@@ -1024,7 +1044,7 @@ export function applyTracking(ctx, canvas, params, time, audioData) {
   
   // Helper to convert hex to rgba
   const hexToRgba = (hex, alpha) => {
-    const h = hex.replace('#', '');
+    const h = (hex || '#ffffff').replace('#', '');
     const r = parseInt(h.substring(0, 2), 16);
     const g = parseInt(h.substring(2, 4), 16);
     const b = parseInt(h.substring(4, 6), 16);
@@ -1077,6 +1097,90 @@ export function applyTracking(ctx, canvas, params, time, audioData) {
   };
   
   const detectedTargets = findTargets();
+  
+  // ===== RECOGNITION STYLE (style=1) - Clean blue boxes with labels =====
+  if (style >= 0.5) {
+    const color = boxColor || '#0088ff';
+    const h = (boxColor || '#0088ff').replace('#', '');
+    const colorR = parseInt(h.substring(0, 2), 16);
+    const colorG = parseInt(h.substring(2, 4), 16);
+    const colorB = parseInt(h.substring(4, 6), 16);
+    
+    detectedTargets.forEach((target, idx) => {
+      const { x, y, w, h, contrast } = target;
+      const halfW = w / 2;
+      const halfH = h / 2;
+      const left = x - halfW;
+      const top = y - halfH;
+      const right = left + w;
+      const bottom = top + h;
+      
+      // Box outline
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(left, top, w, h);
+      
+      // Corner accents (thicker corners)
+      const cornerLen = Math.min(w, h) * 0.2;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      // Top-left
+      ctx.moveTo(left, top + cornerLen);
+      ctx.lineTo(left, top);
+      ctx.lineTo(left + cornerLen, top);
+      // Top-right
+      ctx.moveTo(right - cornerLen, top);
+      ctx.lineTo(right, top);
+      ctx.lineTo(right, top + cornerLen);
+      // Bottom-right
+      ctx.moveTo(right, bottom - cornerLen);
+      ctx.lineTo(right, bottom);
+      ctx.lineTo(right - cornerLen, bottom);
+      // Bottom-left
+      ctx.moveTo(left + cornerLen, bottom);
+      ctx.lineTo(left, bottom);
+      ctx.lineTo(left, bottom - cornerLen);
+      ctx.stroke();
+      
+      // Label - top right, outside the box
+      const labelText = `PERSON ${String(idx + 1).padStart(2, '0')}`;
+      ctx.font = 'bold 11px monospace';
+      const labelWidth = ctx.measureText(labelText).width + 10;
+      const labelHeight = 18;
+      const labelX = right - labelWidth;
+      const labelY = top - labelHeight - 4;
+      
+      // Label background
+      ctx.fillStyle = `rgba(${colorR}, ${colorG}, ${colorB}, 0.9)`;
+      ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
+      
+      // Label text
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(labelText, labelX + 5, labelY + 13);
+      
+      // Confidence bar (below label)
+      const confidence = Math.min(100, Math.floor((contrast / 150) * 100));
+      const barWidth = labelWidth * (confidence / 100);
+      ctx.fillStyle = `rgba(${colorR}, ${colorG}, ${colorB}, 0.5)`;
+      ctx.fillRect(labelX, labelY + labelHeight, labelWidth, 3);
+      ctx.fillStyle = color;
+      ctx.fillRect(labelX, labelY + labelHeight, barWidth, 3);
+    });
+    
+    // Status bar at bottom
+    if (timestamp) {
+      const ts = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      ctx.fillStyle = `rgba(${colorR}, ${colorG}, ${colorB}, 0.8)`;
+      ctx.fillRect(0, canvas.height - 24, canvas.width, 24);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px monospace';
+      ctx.fillText(`${detectedTargets.length} DETECTED`, 10, canvas.height - 8);
+      ctx.fillStyle = `rgba(255, 255, 255, 0.7)`;
+      ctx.fillText(ts, canvas.width - 160, canvas.height - 8);
+    }
+    
+    return; // Skip tech style
+  }
   
   // Use colors from parameters
   const main = mainColor || '#00ff00';
@@ -2521,6 +2625,193 @@ function applyMotionBlur(ctx, canvas, params, time, audioData, state) {
   ctx.globalAlpha = 1;
 }
 
+// Apply real 3D transform effect
+let transform3dCanvas = null;
+function applyTransform3d(ctx, canvas, params, time, audioData) {
+  const { mode, rotateX, rotateY, rotateZ, bend, perspective, segments, animate } = params;
+  const audioBoost = audioData?.overall || 0;
+  
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // Reuse temp canvas
+  if (!transform3dCanvas || transform3dCanvas.width !== width || transform3dCanvas.height !== height) {
+    transform3dCanvas = document.createElement('canvas');
+    transform3dCanvas.width = width;
+    transform3dCanvas.height = height;
+  }
+  const tempCtx = transform3dCanvas.getContext('2d');
+  tempCtx.drawImage(canvas, 0, 0);
+  
+  // Animation
+  const animTime = animate ? time : 0;
+  
+  // Convert angles to radians
+  let rx = ((rotateX + (animate ? Math.sin(animTime) * 20 : 0)) * Math.PI) / 180;
+  let ry = ((rotateY + (animate ? Math.cos(animTime * 0.7) * 20 : 0)) * Math.PI) / 180;
+  let rz = ((rotateZ + (animate ? animTime * 30 : 0)) * Math.PI) / 180;
+  
+  // Audio reactivity
+  rx *= (1 + audioBoost * 0.3);
+  ry *= (1 + audioBoost * 0.3);
+  
+  const cosX = Math.cos(rx), sinX = Math.sin(rx);
+  const cosY = Math.cos(ry), sinY = Math.sin(ry);
+  const cosZ = Math.cos(rz), sinZ = Math.sin(rz);
+  
+  const cx = width / 2;
+  const cy = height / 2;
+  const segs = Math.max(5, segments);
+  const bendAmt = bend / 100 * Math.PI * 0.5;
+  
+  // Clear canvas
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, width, height);
+  
+  // Project 3D point to 2D with perspective
+  const project = (x, y, z) => {
+    // Center coordinates
+    let px = x - cx;
+    let py = y - cy;
+    let pz = z;
+    
+    // Rotate Z
+    const x1 = px * cosZ - py * sinZ;
+    const y1 = px * sinZ + py * cosZ;
+    
+    // Rotate Y
+    const x2 = x1 * cosY - pz * sinY;
+    const z2 = x1 * sinY + pz * cosY;
+    
+    // Rotate X
+    const y2 = y1 * cosX - z2 * sinX;
+    const z3 = y1 * sinX + z2 * cosX;
+    
+    // Perspective
+    const scale = perspective / (perspective + z3);
+    
+    return {
+      x: cx + x2 * scale,
+      y: cy + y2 * scale,
+      z: z3,
+      scale
+    };
+  };
+  
+  // Calculate Z based on mode
+  const getZ = (u, v) => {
+    const nu = u * 2 - 1; // -1 to 1
+    const nv = v * 2 - 1;
+    
+    switch (mode) {
+      case 0: // Flat rotation (no Z displacement)
+        return 0;
+        
+      case 1: // Bend (cylinder-like bend)
+        return Math.sin(nu * Math.PI * 0.5) * bendAmt * width * 0.3;
+        
+      case 2: // Sphere
+        const sphereR = Math.sqrt(1 - nu * nu - nv * nv);
+        if (isNaN(sphereR)) return -500;
+        return sphereR * width * 0.3 * (bend / 50);
+        
+      case 3: // Cylinder (vertical)
+        return Math.cos(nu * Math.PI) * width * 0.2 * (bend / 50);
+        
+      case 4: // Wave
+        return Math.sin(nu * Math.PI * 2 + animTime * 3) * Math.cos(nv * Math.PI + animTime * 2) * 50 * (bend / 50 + 1);
+        
+      case 5: // Fold (book fold)
+        return Math.abs(nu) * bendAmt * width * 0.3;
+        
+      case 6: // Twist
+        const twistAngle = nv * bendAmt * 2;
+        return Math.sin(twistAngle) * nu * width * 0.2;
+        
+      default:
+        return 0;
+    }
+  };
+  
+  // Build mesh of quads
+  const segW = width / segs;
+  const segH = height / segs;
+  const quads = [];
+  
+  for (let yi = 0; yi < segs; yi++) {
+    for (let xi = 0; xi < segs; xi++) {
+      const x0 = xi * segW;
+      const y0 = yi * segH;
+      const x1 = (xi + 1) * segW;
+      const y1 = (yi + 1) * segH;
+      
+      const u0 = xi / segs, u1 = (xi + 1) / segs;
+      const v0 = yi / segs, v1 = (yi + 1) / segs;
+      
+      const z00 = getZ(u0, v0);
+      const z10 = getZ(u1, v0);
+      const z01 = getZ(u0, v1);
+      const z11 = getZ(u1, v1);
+      
+      const p00 = project(x0, y0, z00);
+      const p10 = project(x1, y0, z10);
+      const p01 = project(x0, y1, z01);
+      const p11 = project(x1, y1, z11);
+      
+      const avgZ = (p00.z + p10.z + p01.z + p11.z) / 4;
+      
+      quads.push({
+        srcX: x0, srcY: y0, srcW: segW, srcH: segH,
+        p: [p00, p10, p11, p01],
+        z: avgZ
+      });
+    }
+  }
+  
+  // Sort back to front
+  quads.sort((a, b) => b.z - a.z);
+  
+  // Draw quads using texture mapping
+  for (const quad of quads) {
+    const { srcX, srcY, srcW, srcH, p } = quad;
+    
+    // Skip if behind camera
+    if (p[0].scale <= 0 || p[1].scale <= 0 || p[2].scale <= 0 || p[3].scale <= 0) continue;
+    
+    // Use canvas transforms for texture mapping (split into 2 triangles)
+    ctx.save();
+    
+    // Draw using path clipping and transform
+    ctx.beginPath();
+    ctx.moveTo(p[0].x, p[0].y);
+    ctx.lineTo(p[1].x, p[1].y);
+    ctx.lineTo(p[2].x, p[2].y);
+    ctx.lineTo(p[3].x, p[3].y);
+    ctx.closePath();
+    ctx.clip();
+    
+    // Calculate transform matrix for this quad
+    // Simplified: use drawImage with calculated bounds
+    const minX = Math.min(p[0].x, p[1].x, p[2].x, p[3].x);
+    const maxX = Math.max(p[0].x, p[1].x, p[2].x, p[3].x);
+    const minY = Math.min(p[0].y, p[1].y, p[2].y, p[3].y);
+    const maxY = Math.max(p[0].y, p[1].y, p[2].y, p[3].y);
+    
+    const destW = maxX - minX;
+    const destH = maxY - minY;
+    
+    if (destW > 0 && destH > 0) {
+      ctx.drawImage(
+        transform3dCanvas,
+        srcX, srcY, srcW, srcH,
+        minX, minY, destW, destH
+      );
+    }
+    
+    ctx.restore();
+  }
+}
+
 // Main effect processor
 export function processEffects(ctx, canvas, activeEffects, effectParams, time, audioData, effectState) {
   const effectProcessors = {
@@ -2548,6 +2839,7 @@ export function processEffects(ctx, canvas, activeEffects, effectParams, time, a
     dither: applyDither,
     wireframe: applyWireframe,
     motionBlur: applyMotionBlur,
+    transform3d: applyTransform3d,
   };
   
   activeEffects.forEach(async (effectId) => {
