@@ -1,7 +1,23 @@
 :root {
-  --bg: #000000;
-  --text: #808080;
-  --border: #404040;
+  /* Light technical palette */
+  --bg: #f3f2ef;            /* warm near-white page */
+  --panel: #ffffff;         /* panels sit slightly brighter than page */
+  --text: #111110;          /* near-black */
+  --text-dim: #8d8b85;      /* secondary labels / values */
+  --border: #d8d6d0;        /* hairline dividers */
+  --border-strong: #111110; /* title-block emphasis */
+  --accent: #e5241b;        /* signal red — active / armed / record */
+  --canvas-bg: #e8e7e2;     /* stage behind media */
+  --dot: #d3d1ca;           /* dotted background grid */
+
+  /* Monospace type system */
+  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', 'Roboto Mono',
+    Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* Type scale — three sizes only */
+  --fs-lg: 14px;  /* logo / section titles */
+  --fs-md: 12px;  /* body, labels, buttons */
+  --fs-sm: 10px;  /* meta, values, status */
 }
 
 * {
@@ -11,10 +27,13 @@
 }
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -28,7 +47,7 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -37,11 +56,11 @@ body {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text);
+  background: var(--text-dim);
 }
 
 /* Selection styling */
 ::selection {
-  background: var(--text);
-  color: var(--bg);
+  background: var(--accent);
+  color: #ffffff;
 }

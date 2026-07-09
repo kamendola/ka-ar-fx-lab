@@ -1,17 +1,27 @@
 .panel {
-  background: var(--bg);
+  background: var(--panel);
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
 
 .header {
-  padding: 12px;
-  font-size: 11px;
-  font-weight: normal;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: var(--fs-md);
+  font-weight: 700;
   letter-spacing: 2px;
   color: var(--text);
   border-bottom: 1px solid var(--border);
+}
+
+.headerCount {
+  font-size: var(--fs-sm);
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: var(--text-dim);
 }
 
 .effectsGrid {
@@ -34,15 +44,25 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   cursor: pointer;
+}
+
+.effectCard.active {
+  background: var(--bg);
 }
 
 .dragHandle {
   cursor: grab;
-  color: var(--text);
-  font-size: 12px;
-  padding: 0 4px;
+  color: var(--text-dim);
+  font-size: var(--fs-md);
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.effectHeader:hover .dragHandle {
+  opacity: 1;
 }
 
 .dragHandle:active {
@@ -54,7 +74,7 @@
 }
 
 .effectCard.dragOver {
-  border-top: 2px solid var(--text);
+  border-top: 2px solid var(--accent);
 }
 
 .stackNumber {
@@ -72,34 +92,38 @@
   flex: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 0;
   border: none;
   background: none;
   cursor: pointer;
+  font-family: inherit;
 }
 
-.effectInfo {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.checkbox {
+  font-size: var(--fs-md);
+  letter-spacing: 0;
+  color: var(--text-dim);
+  white-space: pre;
+}
+
+.effectCard.active .checkbox {
+  color: var(--accent);
 }
 
 .effectName {
-  font-size: 10px;
-  font-weight: normal;
-  letter-spacing: 1px;
-  color: var(--text);
-}
-
-.effectStatus {
-  font-size: 9px;
+  font-size: var(--fs-md);
+  font-weight: 400;
   letter-spacing: 1px;
   color: var(--text-dim);
 }
 
-.effectCard.active .effectStatus {
+.effectCard.active .effectName {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.effectToggle:hover .effectName {
   color: var(--text);
 }
 
@@ -121,44 +145,84 @@
 }
 
 .paramLabel {
-  width: 60px;
-  font-size: 9px;
-  color: var(--text);
+  width: 64px;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
   letter-spacing: 1px;
 }
 
 .paramSlider {
   flex: 1;
-  height: 2px;
+  height: 18px; /* tall hit area — easier to grab */
   -webkit-appearance: none;
   appearance: none;
-  background: var(--border);
+  background: transparent;
   outline: none;
   cursor: pointer;
+}
+
+/* WebKit: draw the track + filled portion, then a fader-cap thumb */
+.paramSlider::-webkit-slider-runnable-track {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    var(--text) 0,
+    var(--text) var(--fill, 50%),
+    var(--border) var(--fill, 50%),
+    var(--border) 100%
+  );
 }
 
 .paramSlider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 3px;
+  height: 11px;
+  margin-top: -5px; /* center the cap over the 1px track */
   background: var(--text);
-  cursor: pointer;
+  cursor: grab;
   border-radius: 0;
+  border: none;
+}
+
+.paramSlider:hover::-webkit-slider-thumb,
+.paramSlider:active::-webkit-slider-thumb {
+  background: var(--accent);
+}
+
+.paramSlider:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+
+/* Firefox */
+.paramSlider::-moz-range-track {
+  height: 1px;
+  background: var(--border);
+}
+
+.paramSlider::-moz-range-progress {
+  height: 1px;
+  background: var(--text);
 }
 
 .paramSlider::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+  width: 3px;
+  height: 11px;
   background: var(--text);
-  cursor: pointer;
+  cursor: grab;
   border: none;
   border-radius: 0;
 }
 
+.paramSlider:hover::-moz-range-thumb,
+.paramSlider:active::-moz-range-thumb {
+  background: var(--accent);
+}
+
 .paramValue {
-  width: 30px;
-  font-size: 9px;
+  width: 32px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
   color: var(--text);
   text-align: right;
 }
@@ -200,6 +264,7 @@
 }
 
 .paramToggle.toggleActive {
-  background: var(--text);
-  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
 }

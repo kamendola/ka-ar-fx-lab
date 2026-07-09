@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useAudioAnalyzer } from './hooks/useAudioAnalyzer';
 import { useHandGesture } from './hooks/useHandGesture';
 import { useMediaProcessor } from './hooks/useMediaProcessor';
+import { useCanvasRecorder } from './hooks/useCanvasRecorder';
 import { MediaCanvas } from './components/MediaCanvas';
 import { EffectsPanel } from './components/EffectsPanel';
 import { AudioVisualizer } from './components/AudioVisualizer';
@@ -9,6 +10,7 @@ import { GestureControl } from './components/GestureControl';
 import { Controls } from './components/Controls';
 import { EFFECTS } from './effects';
 import { renderVideoPro } from './renderVideoPro';
+import { renderImagePro } from './renderImagePro';
 import './App.css';
 
 // Load user presets from localStorage
@@ -39,6 +41,7 @@ function App() {
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [renderStatus, setRenderStatus] = useState('');
+  const [imageDuration, setImageDuration] = useState(5); // seconds, for still-image renders
   const [currentFps, setCurrentFps] = useState(0);
   const canvasRef = useRef(null);
   const renderCancelRef = useRef(false);
@@ -66,6 +69,7 @@ function App() {
     videoRef,
     imageRef,
   } = useMediaProcessor();
+  const { isRecording, recordingTime, startRecording, stopRecording } = useCanvasRecorder();
 
   // Initialize effect params with defaults
   const initializeEffectParams = useCallback((effectId) => {
@@ -136,24 +140,43 @@ function App() {
     link.click();
   }, []);
 
-  // Render video with effects (professional WebCodecs encoder)
+  // Render an MP4 with effects (professional WebCodecs encoder).
+  // Works for both video (frame-accurate seek) and still images (time-animated
+  // effects baked over a chosen duration).
   const renderVideo = useCallback(async () => {
-    if (mediaType !== 'video' || !videoRef.current) {
-      alert('Please load a video first');
-      return;
-    }
-
-    const video = videoRef.current;
-    const duration = video.duration;
-    
-    if (!duration || duration === Infinity) {
-      alert('Unable to determine video duration');
+    if (!media) {
+      alert('Please load an image or video first');
       return;
     }
 
     if (!canvasRef.current) {
       alert('Canvas not ready');
       return;
+    }
+
+    if (activeEffects.length === 0) {
+      alert('Add at least one effect to render');
+      return;
+    }
+
+    // Validate source per media type
+    let duration;
+    if (mediaType === 'video') {
+      if (!videoRef.current) {
+        alert('Please load a video first');
+        return;
+      }
+      duration = videoRef.current.duration;
+      if (!duration || duration === Infinity) {
+        alert('Unable to determine video duration');
+        return;
+      }
+    } else {
+      if (!imageRef.current) {
+        alert('Please load an image first');
+        return;
+      }
+      duration = imageDuration;
     }
 
     setIsRendering(true);
@@ -163,18 +186,30 @@ function App() {
 
     try {
       // Use professional WebCodecs renderer for perfect quality and timing
-      const result = await renderVideoPro({
-        video,
-        canvas: canvasRef.current,
-        duration,
-        activeEffects,
-        effectParams,
-        audioData,
-        onProgress: setRenderProgress,
-        onStatus: setRenderStatus,
-        cancelRef: renderCancelRef,
-      });
-      
+      const result = mediaType === 'video'
+        ? await renderVideoPro({
+            video: videoRef.current,
+            canvas: canvasRef.current,
+            duration,
+            activeEffects,
+            effectParams,
+            audioData,
+            onProgress: setRenderProgress,
+            onStatus: setRenderStatus,
+            cancelRef: renderCancelRef,
+          })
+        : await renderImagePro({
+            image: imageRef.current,
+            canvas: canvasRef.current,
+            duration,
+            activeEffects,
+            effectParams,
+            audioData,
+            onProgress: setRenderProgress,
+            onStatus: setRenderStatus,
+            cancelRef: renderCancelRef,
+          });
+
       // Download the result
       const url = URL.createObjectURL(result.blob);
       const link = document.createElement('a');
@@ -182,22 +217,22 @@ function App() {
       link.download = `glitch-lab-${result.width}x${result.height}-${Date.now()}.${result.ext}`;
       link.click();
       URL.revokeObjectURL(url);
-      
+
       setIsRendering(false);
       setRenderProgress(0);
       setRenderStatus('');
-      
+
     } catch (err) {
       console.error('[Render] Error:', err);
       if (err.message !== 'Cancelled') {
         alert('Failed to render video: ' + err.message);
       }
-      
+
       setIsRendering(false);
       setRenderProgress(0);
       setRenderStatus('');
     }
-  }, [mediaType, videoRef, canvasRef, activeEffects, effectParams, audioData]);
+  }, [media, mediaType, videoRef, imageRef, canvasRef, activeEffects, effectParams, audioData, imageDuration]);
 
   // Cancel rendering
   const cancelRender = useCallback(() => {
@@ -206,6 +241,15 @@ function App() {
     setRenderProgress(0);
     setRenderStatus('');
   }, []);
+
+  // Live-record the canvas as you tweak effects (toggles start/stop)
+  const handleToggleRecord = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording(canvasRef.current);
+    }
+  }, [isRecording, startRecording, stopRecording]);
 
   const handleReset = useCallback(() => {
     setActiveEffects([]);
@@ -356,6 +400,11 @@ function App() {
             onRenderVideo={renderVideo}
             onCancelRender={cancelRender}
             onReset={handleReset}
+            imageDuration={imageDuration}
+            onImageDurationChange={setImageDuration}
+            isRecording={isRecording}
+            recordingTime={recordingTime}
+            onToggleRecord={handleToggleRecord}
           />
           <MediaCanvas
             media={media}
@@ -466,15 +515,13 @@ function App() {
               </span>
             </div>
             {media && currentFps > 0 && (
-              <div className="info-row" style={{ 
-                color: currentFps >= 30 ? '#00ff88' : currentFps >= 20 ? '#ffaa00' : '#ff3366' 
-              }}>
+              <div className="info-row" style={{ color: currentFps < 20 ? 'var(--accent)' : undefined }}>
                 <span className="info-label">FPS</span>
                 <span className="info-value">{currentFps}</span>
               </div>
             )}
             {activeEffects.length >= 3 && (
-              <div className="info-row" style={{ color: activeEffects.length >= 5 ? '#ffaa00' : '#00ffaa' }}>
+              <div className="info-row" style={{ color: activeEffects.length >= 5 ? 'var(--accent)' : undefined }}>
                 <span className="info-label">PERF</span>
                 <span className="info-value">
                   {activeEffects.length >= 5 ? 'LOW' : 'OK'}
@@ -482,7 +529,7 @@ function App() {
               </div>
             )}
             {isRendering && (
-              <div className="info-row" style={{ color: 'var(--text)', fontSize: '9px', gridColumn: '1 / -1', textAlign: 'center', padding: '4px 0' }}>
+              <div className="info-row" style={{ color: 'var(--accent)', gridColumn: '1 / -1', textAlign: 'center', padding: '4px 0' }}>
                 {renderStatus || `ENCODING ${renderProgress}%`}
               </div>
             )}

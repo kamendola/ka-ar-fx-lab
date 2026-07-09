@@ -4,7 +4,9 @@
   align-items: center;
   justify-content: center;
   flex: 1;
-  background: var(--bg);
+  background-color: var(--canvas-bg);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 20px 20px;
   border: 1px solid var(--border);
 }
 
@@ -25,8 +27,8 @@
 }
 
 .placeholder {
-  color: var(--text);
-  font-size: 11px;
+  color: var(--text-dim);
+  font-size: var(--fs-md);
   letter-spacing: 1px;
   text-align: center;
 }
@@ -37,11 +39,15 @@
 }
 
 .placeholderText {
-  font-size: 12px;
-  margin-bottom: 5px;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text);
+  margin-bottom: 6px;
 }
 
 .placeholderSubtext {
-  font-size: 10px;
-  opacity: 0.6;
+  font-size: var(--fs-sm);
+  letter-spacing: 1px;
+  color: var(--text-dim);
 }

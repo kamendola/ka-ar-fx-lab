@@ -1,9 +1,9 @@
 .controls {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 0;
   padding: 0;
-  background: var(--bg);
+  background: var(--panel);
   border: 1px solid var(--border);
   margin-bottom: 20px;
 }
@@ -28,11 +28,11 @@
   gap: 6px;
   padding: 12px;
   font-family: inherit;
-  font-size: 10px;
-  font-weight: normal;
+  font-size: var(--fs-sm);
+  font-weight: 700;
   letter-spacing: 2px;
   color: var(--text);
-  background: var(--bg);
+  background: transparent;
   border: none;
   border-right: 1px solid var(--border);
   cursor: pointer;
@@ -40,7 +40,8 @@
 }
 
 .uploadBtn:hover {
-  background: var(--border);
+  background: var(--text);
+  color: var(--bg);
 }
 
 .uploadIcon {
@@ -54,11 +55,11 @@
   gap: 6px;
   padding: 12px;
   font-family: inherit;
-  font-size: 10px;
-  font-weight: normal;
+  font-size: var(--fs-sm);
+  font-weight: 700;
   letter-spacing: 2px;
   color: var(--text);
-  background: var(--bg);
+  background: transparent;
   border: none;
   border-right: 1px solid var(--border);
   cursor: pointer;
@@ -84,15 +85,60 @@
 }
 
 .controlBtn.danger:hover {
-  background: var(--text);
-  color: var(--bg);
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .controlBtn.rendering {
-  color: var(--text);
-  background: var(--border);
+  color: #ffffff;
+  background: var(--accent);
 }
 
 .btnIcon {
   font-size: 12px;
+}
+
+.durationSelect {
+  padding: 12px 8px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: normal;
+  letter-spacing: 2px;
+  color: var(--text);
+  background: var(--bg);
+  border: none;
+  border-right: 1px solid var(--border);
+  cursor: pointer;
+  appearance: none;
+  text-align: center;
+}
+
+.durationSelect:hover {
+  background: var(--border);
+}
+
+.recordBtn {
+  gap: 8px;
+}
+
+.recDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.recordBtn.recording {
+  color: var(--accent);
+}
+
+.recordBtn.recording .recDot {
+  animation: recBlink 1s steps(1, end) infinite;
+}
+
+@keyframes recBlink {
+  50% {
+    opacity: 0;
+  }
 }

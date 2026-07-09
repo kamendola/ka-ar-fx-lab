@@ -78,7 +78,10 @@ export function EffectsPanel({
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
-        EFFECTS
+        <span>[-] EFFECTS</span>
+        <span className={styles.headerCount}>
+          {String(activeEffects.length).padStart(2, '0')}/{String(effectOrder.length).padStart(2, '0')}
+        </span>
       </div>
 
       <div className={styles.effectsGrid}>
@@ -105,16 +108,14 @@ export function EffectsPanel({
                 onDragStart={(e) => handleDragStart(e, id)}
                 onDragEnd={handleDragEnd}
               >
-                <span className={styles.dragHandle}>::</span>
                 <button
                   className={styles.effectToggle}
                   onClick={() => onToggleEffect(id)}
                 >
+                  <span className={styles.checkbox}>{isActive ? '[●]' : '[ ]'}</span>
                   <span className={styles.effectName}>{effect.name}</span>
-                  <span className={styles.effectStatus}>
-                    {isActive ? 'ON' : 'OFF'}
-                  </span>
                 </button>
+                <span className={styles.dragHandle}>::</span>
               </div>
 
               {isActive && (
@@ -159,6 +160,15 @@ export function EffectsPanel({
                                 onParamChange(id, paramId, Number(e.target.value))
                               }
                               className={styles.paramSlider}
+                              style={{
+                                '--fill': `${
+                                  paramDef.max === paramDef.min
+                                    ? 0
+                                    : ((value - paramDef.min) /
+                                        (paramDef.max - paramDef.min)) *
+                                      100
+                                }%`,
+                              }}
                             />
                             <span className={styles.paramValue}>{value}</span>
                           </>

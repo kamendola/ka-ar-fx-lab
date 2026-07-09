@@ -12,7 +12,18 @@ export function Controls({
   onRenderVideo,
   onCancelRender,
   onReset,
+  imageDuration,
+  onImageDurationChange,
+  isRecording,
+  recordingTime,
+  onToggleRecord,
 }) {
+  const formatTime = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = String(s % 60).padStart(2, '0');
+    return `${m}:${sec}`;
+  };
+
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -54,37 +65,61 @@ export function Controls({
       {media && (
         <>
           {mediaType === 'video' && (
-            <button 
-              className={styles.controlBtn} 
+            <button
+              className={styles.controlBtn}
               onClick={onTogglePlayback}
-              disabled={isRendering}
+              disabled={isRendering || isRecording}
             >
               {isPlaying ? 'PAUSE' : 'PLAY'}
             </button>
           )}
 
-          <button 
-            className={styles.controlBtn} 
+          <button
+            className={styles.controlBtn}
             onClick={onExport}
-            disabled={isRendering}
+            disabled={isRendering || isRecording}
           >
             IMAGE
           </button>
 
-          {mediaType === 'video' && (
-            <button 
-              className={`${styles.controlBtn} ${isRendering ? styles.rendering : ''}`} 
-              onClick={isRendering ? onCancelRender : onRenderVideo}
-              title={isRendering ? 'Cancel render' : 'Render video with effects'}
+          {mediaType === 'image' && !isRendering && !isRecording && (
+            <select
+              className={styles.durationSelect}
+              value={imageDuration}
+              onChange={(e) => onImageDurationChange(Number(e.target.value))}
+              title="Length of the rendered clip"
             >
-              {isRendering ? `STOP ${renderProgress}%` : 'RENDER'}
-            </button>
+              <option value={3}>3S</option>
+              <option value={5}>5S</option>
+              <option value={8}>8S</option>
+              <option value={10}>10S</option>
+              <option value={15}>15S</option>
+            </select>
           )}
+
+          <button
+            className={`${styles.controlBtn} ${isRendering ? styles.rendering : ''}`}
+            onClick={isRendering ? onCancelRender : onRenderVideo}
+            disabled={isRecording}
+            title={isRendering ? 'Cancel render' : 'Render an MP4 with effects'}
+          >
+            {isRendering ? `STOP ${renderProgress}%` : 'RENDER'}
+          </button>
+
+          <button
+            className={`${styles.controlBtn} ${styles.recordBtn} ${isRecording ? styles.recording : ''}`}
+            onClick={onToggleRecord}
+            disabled={isRendering}
+            title={isRecording ? 'Stop recording' : 'Record the canvas live (MP4)'}
+          >
+            <span className={styles.recDot} />
+            {isRecording ? `REC ${formatTime(recordingTime)}` : 'REC'}
+          </button>
 
           <button
             className={`${styles.controlBtn} ${styles.danger}`}
             onClick={onReset}
-            disabled={isRendering}
+            disabled={isRendering || isRecording}
           >
             RESET
           </button>
